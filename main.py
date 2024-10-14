@@ -162,12 +162,12 @@ def compress(img, factor=0.5):
 
     eigen_values, eigen_vector = np.linalg.eig(matrice_cov)
     transfer_matrix = np.transpose(eigen_vector)
-    inverse_transfer_matrix = np.linalg.inv(transfer_matrix)
+    inversed_transfer_matrix = np.linalg.inv(transfer_matrix)
 
     Iv = transfer_matrix.dot(img)
     size = len(Iv)
     Iv = [Iv[n] if n < (size * factor) else np.zeros(size) for n in range(size)]
-    Io = transfer_matrix.dot(Iv)
+    Io = inversed_transfer_matrix.dot(Iv)
 
     return Io
 
