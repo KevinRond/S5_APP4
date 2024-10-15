@@ -42,21 +42,21 @@ def create_filter(filter_type: Literal["butter", "cheby1", "cheby2", "ellip"]= "
     rp = 0.2
     rs = 60
     if filter_type == "butter":
-        N_min, wn = signal.buttord(wp, ws, rp, rs)
+        N_min, wn = signal.buttord(wp, ws, rp, rs, fs=fs)
         b, a = signal.butter(N_min, wn, btype="low", output='ba')
         print(f"ordre du filtre {filter_type}: {N_min}")
     elif filter_type == "cheby1":
-        N_min, wn = signal.cheb1ord(wp, ws, rp, rs)
+        N_min, wn = signal.cheb1ord(wp, ws, rp, rs, fs=fs)
         b, a = signal.cheby1(N_min, rp, wn, btype="low", output='ba')
         print(f"ordre du filtre {filter_type}: {N_min}")
 
     elif filter_type == "cheby2":
-        N_min, wn = signal.cheb2ord(wp, ws, rp, rs)
+        N_min, wn = signal.cheb2ord(wp, ws, rp, rs, fs=fs)
         b, a = signal.cheby2(N_min, rp, wn, btype="low", output='ba')
         print(f"ordre du filtre {filter_type}: {N_min}")
 
     elif filter_type == "ellip":
-        N_min, wn = signal.ellipord(wp, ws, rp, rs)
+        N_min, wn = signal.ellipord(wp, ws, rp, rs, fs=fs)
         b, a = signal.ellip(N_min, rp, rs, wn, btype="low", output='ba')
         print(f"ordre du filtre {filter_type}: {N_min}")
 
