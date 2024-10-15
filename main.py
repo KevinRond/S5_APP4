@@ -14,7 +14,7 @@ def get_aberration(img):
     a = np.poly(poles)
     b = np.poly(zeroes)
 
-    zp.zplane(b, a)
+    zp.zplane(b, a, plot_title="Stabilité du filtre non-corrigé")
 
     show_image(img, "Image avec les aberrations")
 
@@ -23,6 +23,7 @@ def get_aberration(img):
 
 def correct_aberrations(img, b, a):
     corrected_img = signal.lfilter(a, b, img)
+    zp.zplane(a, b, plot_title="Stabilité du filtre corrigé")
     show_image(corrected_img, "Image sans les aberrations")
     return corrected_img
 
@@ -62,7 +63,7 @@ def create_filter(filter_type: Literal["butter", "cheby1", "cheby2", "ellip"]= "
     # Transforme freq normalise sur pi en Hz
     freq_Hz = w * fs/(2*np.pi)
 
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 6))
+
 
     match filter_type:
         case "butter":
@@ -75,14 +76,18 @@ def create_filter(filter_type: Literal["butter", "cheby1", "cheby2", "ellip"]= "
             filter_type_name = "Elliptic"
         case _: filter_type_name = "Butterworth"
 
+    zp.zplane(b, a, plot_title=f"Plan Complexe du filtre de type {filter_type_name}")
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 6))
+
     ax1.plot(freq_Hz, H_db)
-    ax1.set_title(f"Frequency Response of the Low-Pass {filter_type_name} Filter")
-    ax1.set_xlabel("Frequency (Hz)")
+    ax1.set_title(f"Réponse fréquentielle du filtre passe-bas de type {filter_type_name}")
+    ax1.set_xlabel("Fréquence (Hz)")
     ax1.set_ylabel("Amplitude (dB)")
     ax1.grid()
 
     ax2.plot(freq_Hz, np.unwrap(phase))
-    ax2.set_xlabel("Frequency (Hz)")
+    ax2.set_xlabel("Fréquence (Hz)")
     ax2.set_ylabel("Phase (radians)")
     ax2.grid()
 
@@ -119,29 +124,55 @@ def apply_filter(img):
             return filtered_img
 
 
-def make_homemade_butterworth(image_path="./assets/goldhill_bruit.npy"):
-    img = np.load(image_path)
+def make_homemade_butterworth(img):
 
     fe = 1600
     wc = 500
     freq_gauchichessement = 2*fe*np.tan((np.pi*wc)/fe)
+    print(f"Fréquence gauchissement: {freq_gauchichessement} rad/s")
+    freq_hertz = freq_gauchichessement / (2*np.pi)
+    print(f"Fréquence gauchissement: {freq_hertz} Hz")
 
-    A = 2 * fe / freq_gauchichessement
+    A = 2 * fe / freq_hertz
     B = np.sqrt(2)
     C = A**2 + A * B + 1
 
     print(f"A: {A}")
-    print(f"B: {B}")
+    print(f"C: {C}")
 
     b = [1/C, 2/C, 1/C]
-    a = [1, (-2 * A**2)/C, (A**2 - A * B + 1)/C]
+    a = [1, (-2 * A**2 + 2)/C, (A**2 - A * B + 1)/C]
+    print(f"b: {b}")
+    print(f"a: {a}")
+
+    w, H = signal.freqz(b, a, fe)
+    H_db = 20 * np.log10(np.abs(H))
+    phase = np.angle(H)
+    freq_Hz = w * fe / (2 * np.pi)
+
+    zp.zplane(b, a, plot_title="Plan Complexe du filtre Butterworth d'ordre 2")
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 6))
+    ax1.plot(freq_Hz, H_db)
+    ax1.set_title(f"Reponse fréquentielle du filtre passe-bas de type Butterworth d'ordre 2")
+    ax1.set_xlabel("Fréquence (Hz)")
+    ax1.set_ylabel("Amplitude (dB)")
+    ax1.grid()
+
+    ax2.plot(freq_Hz, np.unwrap(phase))
+    ax2.set_xlabel("Fréquence (Hz)")
+    ax2.set_ylabel("Phase (radians)")
+    ax2.grid()
+
+    plt.tight_layout()
+    plt.show()
 
     filtered_img = signal.lfilter(b, a, img)
-    show_image(filtered_img, "test with homemade butterworth")
+    show_image(filtered_img, "Image avec le filtre Butterworth d'ordre 2\nconçu avec la transformation bilinéaire")
 
 def rotate_base(img):
     # img = np.mean(img, -1)
-    show_image(img, "before rotation")
+    show_image(img, "Image avant la rotation")
     x, y  = img.shape
 
     new_img = np.zeros((x, y))
@@ -152,14 +183,13 @@ def rotate_base(img):
 
             new_img[u1][u2] = img[e1][e2]
 
+    show_image(new_img, "Image après la rotation")
+
     return new_img
 
 def compress(img, factor=0.5):
-    # img = np.mean(img, -1)
-    print(img)
-    matrice_cov = np.cov(img)
-    print(matrice_cov)
 
+    matrice_cov = np.cov(img)
     eigen_values, eigen_vector = np.linalg.eig(matrice_cov)
     transfer_matrix = np.transpose(eigen_vector)
     inversed_transfer_matrix = np.linalg.inv(transfer_matrix)
@@ -169,6 +199,8 @@ def compress(img, factor=0.5):
     Iv = [Iv[n] if n < (size * factor) else np.zeros(size) for n in range(size)]
     Io = inversed_transfer_matrix.dot(Iv)
 
+    show_image(Io, f"Image après suppression de {(1-factor)*100}%\ndes vecteurs propres")
+
     return Io
 
 def extract_complete_img(img_path="./assets/image_complete.npy"):
@@ -177,20 +209,13 @@ def extract_complete_img(img_path="./assets/image_complete.npy"):
     corrected_aberration = correct_aberrations(img, b, a)
     rotated_img = rotate_base(corrected_aberration)
     elliptic_filter = apply_filter(rotated_img)
-
+    make_homemade_butterworth(rotated_img)
+    show_image(elliptic_filter, "Image avant la compression")
     compressed_img = compress(elliptic_filter)
-    show_image(compressed_img, "Image compressé")
+    more_compressed_img = compress(elliptic_filter, 0.3)
 
 
 
 
 if __name__ == '__main__':
-    # matrix_aberration, b, a = get_aberration()
-    # correct_aberrations(matrix_aberration, b, a)
-    # apply_filter()
-    # make_homemade_butterworth()
-    # img = mpimg.imread('./assets/goldhill_rotate.png')
-    # rotated_img = rotate_base(img)
-    # show_image(rotated_img, "testing")
-    # compress(img)
     extract_complete_img()
